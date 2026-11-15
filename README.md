@@ -8,6 +8,30 @@ App Courier (Compose · MVVM · Room) → API RutaLog (Vercel) → Neon (Postgre
 
 La app nunca habla con el banco ni con la base de datos: todo pasa por la API.
 
+## Cómo probarla
+
+**Instalar:** abrir esta carpeta en Android Studio y pulsar **Run** en un celular con Android 10 o superior y Google Play services. La app usa la API publicada (`https://app-api-rutalog.vercel.app`), así que no hace falta levantar ningún servidor.
+
+**Entrar:** `courier1@rutalog.pe`, clave `1234` (Rosa Huamán Torres, zona Lima y Callao). Al entrar, aceptar los permisos de **ubicación** y de **notificaciones**.
+
+**Recorrido de 5 pasos:**
+
+1. **Ruta del día:** el mapa muestra las paradas numeradas (naranja = recojo, verde = entrega) y arriba los km del orden ML-04 frente al orden de registro. Con las flechas ↑↓ se reordena a mano.
+2. **Recojo:** abrir una parada de **recojo** → *Escanear guía y recoger* (o *Escribir la guía a mano*). Si la guía no es la de la parada, la app lo avisa. Con la correcta, el envío pasa a RECOGIDO con hora y GPS.
+3. **Reparto:** en la misma parada, *Salir a la ciudad de destino* y luego *Salir a reparto*. La parada pasa a ser de **entrega**.
+4. **Entrega:** *Entregar con foto y firma* → tomar la foto, firmar con el dedo, nombre y DNI de quien recibe → *Cerrar entrega*. Sin foto o firma no deja cerrar.
+5. **Entrega fallida:** en otra parada de entrega, *Entrega fallida* → motivo y foto de la fachada. Al tercer intento el envío vuelve al remitente.
+
+**Sin señal:** activar el modo avión y repetir los pasos 2 a 5. Todo queda guardado con su hora real; la pestaña *Sincronizar* muestra la cola, y al quitar el modo avión se envía sola.
+
+**Para ver el resultado en las otras apps:**
+- **App Admin** (`supervisor@rutalog.pe` / `1234`): asignar más envíos a Rosa (*Asignar*) y ver y reprogramar las entregas fallidas.
+- **App Cliente** (`cliente@rutalog.pe` / `1234`): en el seguimiento del envío aparecen los pasos con su hora y la prueba de entrega.
+
+**Dos límites que pide la ficha:**
+- Un envío **contraentrega** no se entrega sin el cobro con QR confirmado (RN-02). Ese cobro llega en la fase de pagos con Banco Andino; por ahora la app explica el motivo y no deja cerrar la entrega.
+- Para escanear, la guía debe estar en un código QR o de barras. Si no se tiene impresa, se usa *Escribir la guía a mano*.
+
 ## Requisitos que cubre
 
 | Requisito | Cómo se cumple |
