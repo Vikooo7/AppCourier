@@ -18,6 +18,12 @@ import com.example.rutalogcourier.viewmodel.SyncViewModel
  */
 class MainActivity : ComponentActivity() {
 
+    /** Al encender la pantalla o volver de otra app, se revisa la red (el sistema la bloquea en segundo plano). */
+    override fun onResume() {
+        super.onResume()
+        (application as RutaLogCourierApplication).contenedor.conectividad.revisarAhora()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // La barra superior siempre es azul oscuro: íconos del sistema en blanco.
