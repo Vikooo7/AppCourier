@@ -79,6 +79,25 @@ class ReglasCourierTest {
     fun unContraentregaNoSeEntregaSinCobro() {
         assertNotNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO, monto = 189.0)))
         assertNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO)))
+        // QR mostrado pero todavía sin pagar: sigue bloqueado (RN-02).
+        assertNotNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO, monto = 189.0).copy(cobroEstado = "POR_COBRAR")))
+        assertNotNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO, monto = 189.0).copy(cobroEstado = "RECHAZADO")))
+    }
+
+    @Test
+    fun conElCobroConfirmadoOPendienteDeConfirmacionSeEntrega() {
+        assertNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO, monto = 189.0).copy(cobroEstado = "CONFIRMADO")))
+        // RF-C06: sin señal, el cobro pendiente de confirmación permite entregar; el banco lo verifica después.
+        assertNull(ReglasCourier.motivoNoEntregar(parada(EstadoEnvio.EN_REPARTO, monto = 189.0).copy(cobroEstado = "PENDIENTE_CONFIRMACION")))
+    }
+
+    @Test
+    fun elCobroSinSenalNecesitaNumeroDeOperacionYFoto() {
+        assertNull(ReglasCourier.validarCobroOffline("BA-44102", tieneFoto = true))
+        assertNull(ReglasCourier.validarCobroOffline(" ba-44102 ", tieneFoto = true))
+        assertNotNull(ReglasCourier.validarCobroOffline("44102", tieneFoto = true))
+        assertNotNull(ReglasCourier.validarCobroOffline("BA-", tieneFoto = true))
+        assertNotNull(ReglasCourier.validarCobroOffline("BA-44102", tieneFoto = false))
     }
 
     @Test

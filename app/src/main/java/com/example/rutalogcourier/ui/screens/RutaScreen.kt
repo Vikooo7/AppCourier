@@ -121,7 +121,7 @@ fun RutaScreen(
                             onParada = onParada,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(260.dp)
+                                .height(320.dp)
                         )
                     }
                 }
@@ -301,6 +301,15 @@ private fun TarjetaParada(
                     parada.kmDesdeAnterior?.let {
                         Text("${"%.1f".format(it)} km", style = MaterialTheme.typography.labelSmall)
                     }
+                }
+                // ML-01 "prioridad en la ruta": entrega con riesgo alto de fallar.
+                parada.textoRiesgo?.let { pct ->
+                    Text(
+                        text = "⚠ Riesgo alto de falla $pct · llama antes",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
                 SyncStatusIndicator(estado = parada.estadoSync)
             }

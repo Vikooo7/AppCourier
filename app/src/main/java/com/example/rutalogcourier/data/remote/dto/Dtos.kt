@@ -14,6 +14,12 @@ data class UsuarioDto(
     val rol: String
 )
 
+/** Ingreso con Google: ID token de Firebase y la app desde la que se entra. */
+data class SocialRequest(
+    val idToken: String,
+    val app: String
+)
+
 data class LoginResponse(
     val token: String,
     val usuario: UsuarioDto
@@ -49,7 +55,32 @@ data class ParadaDto(
     val latitud: Double?,
     val longitud: Double?,
     val kmDesdeAnterior: Double?,
-    val envio: EnvioDto
+    val envio: EnvioDto,
+    /** RF-C05: en las entregas contraentrega, el cobro QR ya creado en Banco Andino (sirve sin señal). */
+    val cobro: CobroDto? = null,
+    /** ML-01 "prioridad en la ruta": riesgo de que la entrega falle (null en los recojos). */
+    val riesgo: RiesgoParadaDto? = null
+)
+
+data class RiesgoParadaDto(val probabilidad: Double, val riesgoAlto: Boolean, val factores: List<String>?)
+
+/** Cobro contraentrega. Estados: POR_COBRAR, PENDIENTE_CONFIRMACION, CONFIRMADO, RECHAZADO, LIQUIDADO. */
+data class CobroDto(
+    val id: String,
+    val monto: Double,
+    val estado: String,
+    /** Texto del QR (BANCOANDINO:QR-...), solo mientras está por cobrar. */
+    val codigoQr: String?,
+    val nroOperacion: String?,
+    val motivoRechazo: String?
+)
+
+/** RF-C06: cobro sin señal con el n.º de operación que muestra la app del banco y la foto del comprobante. */
+data class CobroOfflineRequest(
+    val uuidOperacion: String,
+    val nroOperacion: String,
+    val comprobante: String,
+    val fechaHora: String
 )
 
 /** GET /api/courier/ruta: paradas ordenadas con ML-04 y lo que va en camino. */

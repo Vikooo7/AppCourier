@@ -34,7 +34,8 @@ class MainActivity : ComponentActivity() {
                     factory = RutaViewModel.factory(
                         repositorio = contenedor.rutaRepository,
                         ubicacion = contenedor.ubicacion,
-                        programarSincronizacion = contenedor::programarSincronizacion
+                        programarSincronizacion = contenedor::programarSincronizacion,
+                        verificarEnBanco = contenedor.syncRepository::verificarCobro
                     )
                 )
                 val syncViewModel: SyncViewModel = viewModel(

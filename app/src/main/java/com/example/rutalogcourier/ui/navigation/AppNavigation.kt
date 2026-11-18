@@ -19,6 +19,7 @@ import androidx.navigation.navArgument
 import com.example.rutalogcourier.ui.components.LocalEnLinea
 import com.example.rutalogcourier.ui.components.LocalOperacionesEnCola
 import com.example.rutalogcourier.ui.components.PestanaCourier
+import com.example.rutalogcourier.ui.screens.CobroScreen
 import com.example.rutalogcourier.ui.screens.EntregaScreen
 import com.example.rutalogcourier.ui.screens.FallidaScreen
 import com.example.rutalogcourier.ui.screens.LoginScreen
@@ -37,10 +38,12 @@ object Rutas {
     const val SINCRONIZAR = "sincronizar"
     const val PARADA = "parada/{id}"
     const val ENTREGA = "entrega/{id}"
+    const val COBRO = "cobro/{id}"
     const val FALLIDA = "fallida/{id}"
 
     fun parada(id: Int) = "parada/$id"
     fun entrega(id: Int) = "entrega/$id"
+    fun cobro(id: Int) = "cobro/$id"
     fun fallida(id: Int) = "fallida/$id"
 }
 
@@ -72,11 +75,17 @@ fun AppNavigation(
         }
     }
 
-    val cerrarSesion: () -> Unit = {
-        authViewModel.cerrarSesion()
+    val salir: (String?) -> Unit = { motivo ->
+        authViewModel.cerrarSesion(motivo)
         navController.navigate(Rutas.LOGIN) {
             popUpTo(navController.graph.id) { inclusive = true }
         }
+    }
+    val cerrarSesion: () -> Unit = { salir(null) }
+
+    // La sesión dura 30 días: al vencer, la API responde 401 y se vuelve al login sin perder la cola.
+    syncViewModel.alVencerSesion = {
+        salir("Tu sesión venció. Vuelve a iniciar sesión: tus cambios sin enviar siguen guardados.")
     }
 
     /** Lo registrado ya está en Room y en la cola; si hay señal se envía de inmediato. */
@@ -121,6 +130,15 @@ fun AppNavigation(
                             }
                         }
                     },
+                    onGoogle = { token ->
+                        authViewModel.loginConGoogle(token) {
+                            syncViewModel.sincronizar(silencioso = true)
+                            navController.navigate(Rutas.RUTA) {
+                                popUpTo(Rutas.LOGIN) { inclusive = true }
+                            }
+                        }
+                    },
+                    onErrorGoogle = authViewModel::avisarError,
                     onLimpiarMensajes = authViewModel::limpiarMensajes
                 )
             }
@@ -167,7 +185,25 @@ fun AppNavigation(
                     onRecoger = { p, guia, onError -> rutaViewModel.registrarRecojo(p, guia, onError, trasRegistrar) },
                     onAvanzar = { p, onError -> rutaViewModel.avanzar(p, onError, trasRegistrar) },
                     onEntregar = { navController.navigate(Rutas.entrega(it.idRemoto)) },
+                    onCobrar = { navController.navigate(Rutas.cobro(it.idRemoto)) },
                     onFallida = { navController.navigate(Rutas.fallida(it.idRemoto)) }
+                )
+            }
+
+            // RF-C05 / RF-C06: cobro contraentrega con QR (o pendiente de confirmación sin señal).
+            composable(Rutas.COBRO, arguments = argumentoId) { entrada ->
+                SesionRequerida(hayUsuario = haySesion, onSinSesion = cerrarSesion)
+                val id = entrada.arguments?.getInt("id") ?: 0
+                val flujo = remember(id) { rutaViewModel.observarParada(id) }
+                val parada by flujo.collectAsState(initial = null)
+                CobroScreen(
+                    parada = parada,
+                    onVolver = { navController.popBackStack() },
+                    onVerificar = rutaViewModel::verificarCobro,
+                    onRegistrarSinSenal = rutaViewModel::registrarCobroOffline,
+                    onContinuar = { p ->
+                        navController.navigate(Rutas.entrega(p.idRemoto)) { popUpTo(Rutas.PARADA) }
+                    }
                 )
             }
 

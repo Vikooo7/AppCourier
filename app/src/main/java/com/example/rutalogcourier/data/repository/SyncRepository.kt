@@ -13,10 +13,13 @@ import com.example.rutalogcourier.data.local.entities.TipoOperacion
 import com.example.rutalogcourier.data.remote.ResultadoApi
 import com.example.rutalogcourier.data.remote.api.ApiService
 import com.example.rutalogcourier.data.remote.dto.EnvioDto
+import com.example.rutalogcourier.data.remote.dto.CobroDto
+import com.example.rutalogcourier.data.remote.dto.CobroOfflineRequest
 import com.example.rutalogcourier.data.remote.dto.EventoRequest
 import com.example.rutalogcourier.data.remote.dto.EvidenciaRequest
 import com.example.rutalogcourier.data.remote.dto.FallidoRequest
 import com.example.rutalogcourier.data.remote.dto.ReordenarRequest
+import com.example.rutalogcourier.data.remote.dto.RiesgoParadaDto
 import com.example.rutalogcourier.data.remote.dto.RutaDto
 import com.example.rutalogcourier.data.remote.llamarApi
 import com.example.rutalogcourier.model.EstadoEnvio
@@ -39,7 +42,9 @@ data class ResultadoSync(
     /** Paradas que no estaban antes (para avisar al courier). */
     val nuevas: Int = 0,
     /** null si todo salió bien; si no, el motivo por el que se detuvo. */
-    val error: String? = null
+    val error: String? = null,
+    /** La API respondió 401: hay que volver a iniciar sesión (los cambios siguen en la cola). */
+    val sesionVencida: Boolean = false
 )
 
 /**
@@ -63,6 +68,26 @@ class SyncRepository(
 
     /** Evita que el botón manual y el SyncWorker sincronicen al mismo tiempo. */
     private val candado = Mutex()
+
+    /**
+     * RF-C05: con señal, pregunta a la API (que pregunta a Banco Andino) si el destinatario ya pagó el QR.
+     * Lo que responde el banco se guarda en la parada.
+     */
+    suspend fun verificarCobro(idRemoto: Int, cobroId: String): Result<CobroDto> =
+        when (val r = llamarApi { api.consultarCobro(cobroId) }) {
+            is ResultadoApi.Exito -> {
+                db.withTransaction {
+                    paradaDao.porId(idRemoto)?.let {
+                        paradaDao.actualizar(it.copy(cobroEstado = r.valor.estado, cobroNro = r.valor.nroOperacion ?: it.cobroNro))
+                    }
+                }
+                Result.success(r.valor)
+            }
+            is ResultadoApi.Rechazo -> Result.failure(Exception(r.mensaje))
+            is ResultadoApi.Fallo -> Result.failure(
+                Exception(if (r.sinConexion) "Sin señal: registra el n.º de operación y la foto del comprobante." else r.mensaje)
+            )
+        }
 
     fun observarOperaciones(): Flow<List<OperacionConGuia>> = operacionDao.observarConGuia()
 
@@ -88,7 +113,7 @@ class SyncRepository(
                     if (resultado.http == 401) {
                         // Sesión vencida: no es un rechazo del registro, que sigue en la cola.
                         marcar(operacion, EstadoSincronizacion.PENDIENTE)
-                        return@withLock ResultadoSync(enviadas, rechazadas, error = resultado.mensaje)
+                        return@withLock ResultadoSync(enviadas, rechazadas, error = resultado.mensaje, sesionVencida = true)
                     }
                     aplicarRechazo(operacion, resultado)
                     rechazadas++
@@ -173,6 +198,16 @@ class SyncRepository(
                 }
             }
 
+            TipoOperacion.COBRO_OFFLINE -> {
+                val d = gson.fromJson(operacion.payload, PayloadCobroOffline::class.java)
+                val foto = base64(d.archivoComprobante) ?: return faltaArchivo()
+                when (val r = llamarApi { api.registrarCobroOffline(id, CobroOfflineRequest(uuid, d.nroOperacion, foto, d.fechaHora)) }) {
+                    is ResultadoApi.Exito -> ResultadoApi.Exito(null)
+                    is ResultadoApi.Rechazo -> r
+                    is ResultadoApi.Fallo -> r
+                }
+            }
+
             TipoOperacion.FALLIDO -> {
                 val d = gson.fromJson(operacion.payload, PayloadFallido::class.java)
                 val foto = base64(d.archivoFoto) ?: return faltaArchivo()
@@ -203,6 +238,7 @@ class SyncRepository(
             TipoOperacion.EVIDENCIA -> gson.fromJson(operacion.payload, PayloadEvidencia::class.java)
                 .let { listOf(it.archivoFoto, it.archivoFirma) }
             TipoOperacion.FALLIDO -> listOf(gson.fromJson(operacion.payload, PayloadFallido::class.java).archivoFoto)
+            TipoOperacion.COBRO_OFFLINE -> listOf(gson.fromJson(operacion.payload, PayloadCobroOffline::class.java).archivoComprobante)
             else -> emptyList()
         }
         nombres.forEach { File(File(context.filesDir, RutaRepository.CARPETA), it).delete() }
@@ -257,7 +293,7 @@ class SyncRepository(
                 ResultadoSync(enviadas, rechazadas, descargados = respuesta.valor.paradas.size, nuevas = nuevas)
             }
 
-            is ResultadoApi.Rechazo -> ResultadoSync(enviadas, rechazadas, error = respuesta.mensaje)
+            is ResultadoApi.Rechazo -> ResultadoSync(enviadas, rechazadas, error = respuesta.mensaje, sesionVencida = respuesta.http == 401)
             is ResultadoApi.Fallo -> ResultadoSync(enviadas, rechazadas, error = respuesta.mensaje)
         }
 
@@ -266,7 +302,9 @@ class SyncRepository(
         val locales = paradaDao.todas().associateBy { it.idRemoto }
         val conCambios = operacionDao.todas().map { it.idRemoto }.toSet()
 
-        val remotas = ruta.paradas.map { p -> p.envio.aEntidad(TipoParada.desde(p.tipo), p.orden, p.kmDesdeAnterior) } +
+        val remotas = ruta.paradas.map { p ->
+            p.envio.aEntidad(TipoParada.desde(p.tipo), p.orden, p.kmDesdeAnterior).conCobro(p.cobro).conRiesgo(p.riesgo)
+        } +
             ruta.enCamino.map { it.aEntidad(TipoParada.EN_CAMINO, ORDEN_EN_CAMINO, null) }
 
         remotas.forEach { remota ->
@@ -300,6 +338,17 @@ class SyncRepository(
         // En la primera descarga todo es "nuevo": solo se avisa de lo que llega después.
         if (locales.isEmpty()) 0 else ruta.paradas.count { it.envio.id !in locales }
     }
+
+    private fun ParadaEntity.conRiesgo(riesgo: RiesgoParadaDto?) =
+        if (riesgo == null) this
+        else copy(
+            riesgoProbabilidad = riesgo.probabilidad,
+            riesgoAlto = riesgo.riesgoAlto,
+            riesgoFactores = riesgo.factores.orEmpty().joinToString(" · ")
+        )
+
+    private fun ParadaEntity.conCobro(cobro: CobroDto?) =
+        if (cobro == null) this else copy(cobroId = cobro.id, cobroEstado = cobro.estado, cobroQr = cobro.codigoQr, cobroNro = cobro.nroOperacion)
 
     private fun EnvioDto.aEntidad(tipo: TipoParada, orden: Int, km: Double?) = ParadaEntity(
         idRemoto = id,

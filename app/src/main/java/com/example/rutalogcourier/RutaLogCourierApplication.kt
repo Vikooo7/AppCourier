@@ -16,8 +16,11 @@ class RutaLogCourierApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         contenedor = AppContainer(this)
-        // OpenStreetMap pide identificar la app que descarga los mapas.
-        Configuration.getInstance().userAgentValue = packageName
+        // OpenStreetMap bloquea las apps con un User-Agent genérico (por ejemplo "com.example..."):
+        // pide un nombre propio, versión y un contacto.
+        val version = packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0"
+        Configuration.getInstance().userAgentValue =
+            "RutaLogCourier/$version (Android; +https://github.com/Vikooo7/AppCourier)"
         Notificaciones.crearCanal(this)
         EscanerGuia.prepararModulo(this)
         SyncWorker.programarPeriodica(this)

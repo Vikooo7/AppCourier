@@ -33,9 +33,8 @@ object ReglasCourier {
 
     /** RN-02: un contraentrega no se entrega sin cobro confirmado; el cobro con QR llega en la fase de pagos. */
     fun motivoNoEntregar(parada: Parada): String? =
-        if (parada.cobraContraentrega) {
-            "Primero hay que cobrar ${"S/ %.2f".format(parada.montoContraentrega)} con QR al destinatario. " +
-                "El cobro contraentrega se activa en la fase de pagos con Banco Andino."
+        if (parada.cobraContraentrega && !parada.cobroListo) {
+            "Primero cobra ${"S/ %.2f".format(parada.montoContraentrega)} con QR al destinatario: sin cobro no se entrega (RN-02)."
         } else {
             null
         }
@@ -54,6 +53,14 @@ object ReglasCourier {
     fun validarFallida(motivo: MotivoFalla?, tieneFoto: Boolean): String? = when {
         motivo == null -> "Elige el motivo."
         !tieneFoto -> "Toma una foto de la fachada como evidencia."
+        else -> null
+    }
+
+    /** RF-C06: el n.º de operación que muestra la app del banco (BA-44102) y la foto del comprobante. */
+    fun validarCobroOffline(nroOperacion: String, tieneFoto: Boolean): String? = when {
+        !Regex("^BA-\\d{3,12}$").matches(nroOperacion.trim().uppercase()) ->
+            "Escribe el n.º de operación tal como lo muestra la app del banco (por ejemplo BA-44102)."
+        !tieneFoto -> "Toma una foto del comprobante en el teléfono del destinatario."
         else -> null
     }
 

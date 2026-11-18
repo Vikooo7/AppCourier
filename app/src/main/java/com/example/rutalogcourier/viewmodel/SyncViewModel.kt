@@ -61,6 +61,9 @@ class SyncViewModel(
     /** La app indica si hay sesión; sin sesión no se sincroniza. */
     var haySesion: () -> Boolean = { false }
 
+    /** La app lleva al login cuando la API dice que la sesión venció (la cola se conserva). */
+    var alVencerSesion: () -> Unit = {}
+
     init {
         viewModelScope.launch {
             repositorio.observarOperaciones().collect { lista ->
@@ -116,6 +119,10 @@ class SyncViewModel(
             _estado.update { it.copy(sincronizando = true, mensaje = null) }
             val resultado = repositorio.sincronizar(obtenerUbicacion())
             _estado.update { it.copy(sincronizando = false) }
+            if (resultado.sesionVencida) {
+                alVencerSesion()
+                return@launch
+            }
             if (!silencioso || resultado.error != null || resultado.rechazadas > 0) {
                 mostrar(describirSincronizacion(resultado), esError = resultado.error != null || resultado.rechazadas > 0)
             }

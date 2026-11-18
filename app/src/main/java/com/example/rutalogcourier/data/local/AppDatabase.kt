@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.rutalogcourier.data.local.dao.OperacionPendienteDao
 import com.example.rutalogcourier.data.local.dao.ParadaDao
 import com.example.rutalogcourier.data.local.dao.UsuarioDao
@@ -26,7 +28,7 @@ import com.example.rutalogcourier.data.local.entities.UsuarioEntity
         OperacionPendienteEntity::class,
         SyncMetadataEntity::class
     ],
-    version = 1,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,6 +41,24 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var instancia: AppDatabase? = null
 
+        /** Fase de pagos: cobro contraentrega de cada parada. Solo agrega columnas: la cola no se pierde. */
+        val MIGRACION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("cobroId", "cobroEstado", "cobroQr", "cobroNro").forEach {
+                    db.execSQL("ALTER TABLE `paradas` ADD COLUMN `$it` TEXT")
+                }
+            }
+        }
+
+        /** Fase BI y ML: riesgo de falla de cada entrega (ML-01). Solo agrega columnas: la cola no se pierde. */
+        val MIGRACION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `paradas` ADD COLUMN `riesgoProbabilidad` REAL")
+                db.execSQL("ALTER TABLE `paradas` ADD COLUMN `riesgoAlto` INTEGER")
+                db.execSQL("ALTER TABLE `paradas` ADD COLUMN `riesgoFactores` TEXT")
+            }
+        }
+
         fun getDB(context: Context): AppDatabase =
             instancia ?: synchronized(this) {
                 instancia ?: Room.databaseBuilder(
@@ -46,6 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "rutalog_courier.db"
                 )
+                    .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
                     .build()
                     .also { instancia = it }
             }

@@ -46,8 +46,22 @@ data class Parada(
     val longitud: Double?,
     val kmDesdeAnterior: Double?,
     val estadoSync: EstadoSincronizacion,
-    val mensajeError: String?
+    val mensajeError: String?,
+    /** RF-C05: cobro contraentrega (id en RutaLog, estado, texto del QR y n.º de operación del banco). */
+    val cobroId: String? = null,
+    val cobroEstado: String? = null,
+    val cobroQr: String? = null,
+    val cobroNro: String? = null,
+    /** ML-01 "prioridad en la ruta": probabilidad de que la entrega falle y por qué. */
+    val riesgoProbabilidad: Double? = null,
+    val riesgoAlto: Boolean = false,
+    val riesgoFactores: List<String> = emptyList()
 ) {
+    /** "87 %": se muestra solo en las entregas de riesgo alto. */
+    val textoRiesgo: String? get() = riesgoProbabilidad?.takeIf { riesgoAlto && tipo == TipoParada.ENTREGA }
+        ?.let { "${(it * 100).toInt()} %" }
+    /** RN-02 / RF-C06: confirmado por el banco o pendiente de confirmación (cobrado sin señal). */
+    val cobroListo: Boolean get() = cobroEstado in setOf("CONFIRMADO", "PENDIENTE_CONFIRMACION", "LIQUIDADO")
     val esParada: Boolean get() = tipo == TipoParada.RECOJO || tipo == TipoParada.ENTREGA
     val cobraContraentrega: Boolean get() = montoContraentrega > 0.0
     val tieneUbicacion: Boolean get() = latitud != null && longitud != null

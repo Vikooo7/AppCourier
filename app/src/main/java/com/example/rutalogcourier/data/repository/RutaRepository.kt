@@ -51,6 +51,13 @@ data class PayloadFallido(
     val longitud: Double?
 )
 
+/** RF-C06: cobro sin señal. */
+data class PayloadCobroOffline(
+    val nroOperacion: String,
+    val archivoComprobante: String,
+    val fechaHora: String
+)
+
 data class PayloadReorden(
     val paradas: List<ParadaOrdenDto>
 )
@@ -83,7 +90,14 @@ fun ParadaEntity.aModelo(): Parada {
         longitud = longitud,
         kmDesdeAnterior = kmDesdeAnterior,
         estadoSync = EstadoSincronizacion.desde(estadoSync),
-        mensajeError = mensajeError
+        mensajeError = mensajeError,
+        cobroId = cobroId,
+        cobroEstado = cobroEstado,
+        cobroQr = cobroQr,
+        cobroNro = cobroNro,
+        riesgoProbabilidad = riesgoProbabilidad,
+        riesgoAlto = riesgoAlto == true,
+        riesgoFactores = riesgoFactores?.split(" · ")?.filter { it.isNotBlank() }.orEmpty()
     )
 }
 
@@ -179,6 +193,27 @@ class RutaRepository(
                 idRemoto,
                 PayloadFallido(motivo.codigo, archivoFoto, ahora(), ubicacion?.latitud, ubicacion?.longitud)
             )
+        }
+    }
+
+    /**
+     * RF-C06: sin señal en la puerta. El destinatario pagó el QR con su app del banco y le muestra el número
+     * de operación; el courier lo anota con una foto del comprobante. Queda PENDIENTE_CONFIRMACION (permite
+     * entregar) y la API lo verifica con Banco Andino al sincronizar.
+     */
+    suspend fun registrarCobroOffline(idRemoto: Int, nroOperacion: String, comprobante: ByteArray) {
+        val archivo = guardarArchivo(comprobante, "jpg")
+        db.withTransaction {
+            val actual = paradaDao.porId(idRemoto) ?: return@withTransaction
+            paradaDao.actualizar(
+                actual.copy(
+                    cobroEstado = "PENDIENTE_CONFIRMACION",
+                    cobroNro = nroOperacion,
+                    estadoSync = EstadoSincronizacion.PENDIENTE.name,
+                    mensajeError = null
+                )
+            )
+            encolar(TipoOperacion.COBRO_OFFLINE, idRemoto, PayloadCobroOffline(nroOperacion, archivo, ahora()))
         }
     }
 

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.rutalogcourier.data.remote.dto.CobroDto
 import com.example.rutalogcourier.data.repository.RutaRepository
 import com.example.rutalogcourier.model.EstadoEnvio
 import com.example.rutalogcourier.model.MotivoFalla
@@ -26,8 +27,45 @@ import kotlinx.coroutines.launch
 class RutaViewModel(
     private val repositorio: RutaRepository,
     private val ubicacion: ProveedorUbicacion,
-    private val programarSincronizacion: () -> Unit
+    private val programarSincronizacion: () -> Unit,
+    /** RF-C05: consulta en línea a la API (que pregunta a Banco Andino) por el cobro de una parada. */
+    private val verificarEnBanco: suspend (idRemoto: Int, cobroId: String) -> Result<CobroDto>
 ) : ViewModel() {
+
+    /** RF-C05: con señal, se pregunta si el destinatario ya pagó el QR. [onResultado] recibe (mensaje, confirmado). */
+    fun verificarCobro(parada: Parada, onResultado: (String, Boolean) -> Unit) {
+        val cobroId = parada.cobroId
+        if (cobroId == null) {
+            onResultado("Esta parada no trae el QR del cobro: actualiza la ruta con señal.", false)
+            return
+        }
+        viewModelScope.launch {
+            verificarEnBanco(parada.idRemoto, cobroId)
+                .onSuccess { cobro ->
+                    when (cobro.estado) {
+                        "CONFIRMADO", "LIQUIDADO" -> onResultado("Banco Andino confirmó el pago · ${cobro.nroOperacion}", true)
+                        "PENDIENTE_CONFIRMACION" -> onResultado("Cobro registrado sin señal: se verificará con el banco.", true)
+                        "RECHAZADO" -> onResultado(cobro.motivoRechazo ?: "El banco rechazó el cobro.", false)
+                        else -> onResultado("Todavía no llega el pago. Pide al destinatario que confirme en su app y vuelve a verificar.", false)
+                    }
+                }
+                .onFailure { onResultado(it.message ?: "No se pudo verificar el cobro.", false) }
+        }
+    }
+
+    /** RF-C06: sin señal, se registra el n.º de operación con la foto del comprobante; queda en la cola. */
+    fun registrarCobroOffline(parada: Parada, nroOperacion: String, foto: ByteArray?, onError: (String) -> Unit, onHecho: () -> Unit) {
+        val error = ReglasCourier.validarCobroOffline(nroOperacion, foto != null)
+        if (error != null || foto == null) {
+            onError(error ?: "Falta la foto del comprobante.")
+            return
+        }
+        viewModelScope.launch {
+            repositorio.registrarCobroOffline(parada.idRemoto, nroOperacion.trim().uppercase(), foto)
+            programarSincronizacion()
+            onHecho()
+        }
+    }
 
     val paradas: StateFlow<List<Parada>> = repositorio.observarParadas()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -136,9 +174,10 @@ class RutaViewModel(
         fun factory(
             repositorio: RutaRepository,
             ubicacion: ProveedorUbicacion,
-            programarSincronizacion: () -> Unit
+            programarSincronizacion: () -> Unit,
+            verificarEnBanco: suspend (idRemoto: Int, cobroId: String) -> Result<CobroDto>
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { RutaViewModel(repositorio, ubicacion, programarSincronizacion) }
+            initializer { RutaViewModel(repositorio, ubicacion, programarSincronizacion, verificarEnBanco) }
         }
     }
 }

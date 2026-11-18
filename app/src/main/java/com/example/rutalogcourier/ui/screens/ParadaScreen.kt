@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -36,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,6 +60,7 @@ import com.example.rutalogcourier.model.EstadoEnvio
 import com.example.rutalogcourier.model.EstadoSincronizacion
 import com.example.rutalogcourier.model.Parada
 import com.example.rutalogcourier.model.ReglasCourier
+import com.example.rutalogcourier.model.TipoParada
 import com.example.rutalogcourier.ui.components.AppScaffold
 import com.example.rutalogcourier.ui.components.BannerDegradado
 import com.example.rutalogcourier.ui.components.EstadoBadge
@@ -79,6 +82,7 @@ fun ParadaScreen(
     onRecoger: (Parada, guia: String, onError: (String) -> Unit) -> Unit,
     onAvanzar: (Parada, onError: (String) -> Unit) -> Unit,
     onEntregar: (Parada) -> Unit,
+    onCobrar: (Parada) -> Unit,
     onFallida: (Parada) -> Unit
 ) {
     val context = LocalContext.current
@@ -124,9 +128,14 @@ fun ParadaScreen(
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Destinatario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Fila(Icons.Default.Person, "Nombre", parada.destinatarioNombre ?: "No registrado")
-                    parada.destinatarioTelefono?.let { Fila(Icons.Default.Phone, "Celular", it) }
-                    Fila(Icons.Default.Home, "Dirección", parada.destinatarioDireccion ?: "No registrada")
+                    if (parada.tipo == TipoParada.ENTREGA) {
+                        Fila(Icons.Default.Person, "Nombre", parada.destinatarioNombre ?: "No registrado")
+                        parada.destinatarioTelefono?.let { Fila(Icons.Default.Phone, "Celular", it) }
+                        Fila(Icons.Default.Home, "Dirección", parada.destinatarioDireccion ?: "No registrada")
+                    } else {
+                        // La API no los envía fuera del reparto: el courier no necesita esos datos para recoger.
+                        Fila(Icons.Default.Lock, "Datos de contacto", "Se muestran en la parada de entrega")
+                    }
                     Fila(Icons.Default.Map, "Ruta", parada.ruta)
                     Fila(
                         Icons.Default.QrCode,
@@ -135,6 +144,33 @@ fun ParadaScreen(
                     )
                     if (parada.intentos > 0) {
                         Fila(Icons.Default.ReportProblem, "Intentos fallidos", "${parada.intentos} de ${EstadoEnvio.MAX_INTENTOS}")
+                    }
+                }
+            }
+
+            // ML-01 "prioridad en la ruta": se recomienda confirmar antes de ir.
+            parada.textoRiesgo?.let { pct ->
+                Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "Riesgo alto de entrega fallida ($pct)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        if (parada.riesgoFactores.isNotEmpty()) {
+                            Text(
+                                "Por qué: ${parada.riesgoFactores.joinToString(" · ")}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        Text(
+                            "Llama al destinatario antes de ir para confirmar que habrá alguien.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
                     }
                 }
             }
@@ -150,6 +186,10 @@ fun ParadaScreen(
             error?.let { MensajeError(texto = it) }
 
             val acciones = ReglasCourier.acciones(parada)
+            // RF-C03 / RN-06: cada avance lleva hora y GPS. Con la ubicación apagada se registra igual, pero sin GPS.
+            if (acciones.isNotEmpty() && !ubicacionActiva(context)) {
+                MensajeInfo("La ubicación del teléfono está apagada: los registros se guardarán sin GPS. Actívala en los ajustes rápidos.")
+            }
             if (acciones.isEmpty()) {
                 MensajeInfo(
                     when (parada.estado) {
@@ -206,6 +246,18 @@ fun ParadaScreen(
                     }
 
                     AccionCourier.ENTREGAR -> {
+                        // RN-02: el contraentrega se cobra con QR antes de entregar.
+                        if (parada.cobraContraentrega && !parada.cobroListo) {
+                            Button(
+                                onClick = { onCobrar(parada) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                            ) {
+                                Icon(Icons.Default.QrCode, contentDescription = null)
+                                Text("  Cobrar ${formatoSoles(parada.montoContraentrega)} con QR")
+                            }
+                        }
                         ReglasCourier.motivoNoEntregar(parada)?.let { MensajeInfo(it) }
                         Button(
                             onClick = { onEntregar(parada) },
@@ -279,3 +331,9 @@ private fun Fila(icono: ImageVector, etiqueta: String, valor: String) {
         }
     }
 }
+
+/** true si el GPS / la ubicación del sistema está encendida (el permiso se pide aparte). */
+private fun ubicacionActiva(context: android.content.Context): Boolean =
+    androidx.core.location.LocationManagerCompat.isLocationEnabled(
+        context.getSystemService(android.location.LocationManager::class.java)
+    )

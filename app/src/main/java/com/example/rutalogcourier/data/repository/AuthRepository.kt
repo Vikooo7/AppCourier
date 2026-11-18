@@ -7,6 +7,8 @@ import com.example.rutalogcourier.data.local.entities.UsuarioEntity
 import com.example.rutalogcourier.data.remote.ResultadoApi
 import com.example.rutalogcourier.data.remote.api.ApiService
 import com.example.rutalogcourier.data.remote.dto.LoginRequest
+import com.example.rutalogcourier.data.remote.dto.LoginResponse
+import com.example.rutalogcourier.data.remote.dto.SocialRequest
 import com.example.rutalogcourier.data.remote.llamarApi
 import com.example.rutalogcourier.model.Usuario
 
@@ -30,7 +32,14 @@ class AuthRepository(
         if (sesion.token == null) null else db.usuarioDao().actual()?.let { Usuario(it.id, it.nombre, it.correo, it.rol) }
 
     suspend fun login(correo: String, clave: String): ResultadoLogin =
-        when (val resultado = llamarApi { api.login(LoginRequest(correo, clave)) }) {
+        abrirSesion(llamarApi { api.login(LoginRequest(correo, clave)) })
+
+    /** Google (vía Firebase): solo entra si la empresa ya registró ese correo. */
+    suspend fun loginConGoogle(idTokenFirebase: String): ResultadoLogin =
+        abrirSesion(llamarApi { api.loginSocial(SocialRequest(idTokenFirebase, "courier")) })
+
+    private suspend fun abrirSesion(resultado: ResultadoApi<LoginResponse>): ResultadoLogin =
+        when (resultado) {
             is ResultadoApi.Exito -> {
                 val perfil = resultado.valor.usuario
                 if (perfil.rol != ROL_COURIER) {

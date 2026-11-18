@@ -40,7 +40,16 @@ data class ParadaEntity(
     val kmDesdeAnterior: Double?,
     /** Nombre de EstadoSincronizacion. */
     val estadoSync: String,
-    val mensajeError: String? = null
+    val mensajeError: String? = null,
+    /** RF-C05 / RF-C06: cobro contraentrega de esta entrega (null si no es contraentrega o no llegó). */
+    val cobroId: String? = null,
+    val cobroEstado: String? = null,
+    val cobroQr: String? = null,
+    val cobroNro: String? = null,
+    /** ML-01: probabilidad de falla, si es riesgo alto y sus razones separadas por " · " (null en recojos). */
+    val riesgoProbabilidad: Double? = null,
+    val riesgoAlto: Boolean? = null,
+    val riesgoFactores: String? = null
 )
 
 /** Resumen de la ruta del día (una sola fila, id = 1). */
@@ -86,6 +95,7 @@ object TipoOperacion {
     const val EVIDENCIA = "EVIDENCIA"
     const val FALLIDO = "FALLIDO"
     const val REORDENAR = "REORDENAR"
+    const val COBRO_OFFLINE = "COBRO_OFFLINE"
 }
 
 /** Última sincronización exitosa. */
