@@ -10,7 +10,11 @@ La app nunca habla con el banco ni con la base de datos: todo pasa por la API.
 
 ## Cómo probarla
 
-**Instalar:** abrir esta carpeta en Android Studio y pulsar **Run** en un celular con Android 10 o superior y Google Play services. La app usa la API publicada (`https://app-api-rutalog.vercel.app`), así que no hace falta levantar ningún servidor.
+**Instalar (lo más rápido):** descargar `RutaLog-Courier.apk` desde **Releases** (columna derecha de esta página) en un celular con Android 10 o superior, permitir "instalar apps de origen desconocido" y abrirla. Con este APK funciona todo, incluido **Entrar con Google**.
+
+**O compilarla:** abrir esta carpeta en Android Studio y pulsar **Run**. Incluye `app/google-services.json` (proyecto Firebase `rutalog-peru`). En un APK compilado en otra PC, *Entrar con Google* necesita que la huella SHA-1 de esa PC se registre en Firebase; el ingreso con correo y clave funciona siempre.
+
+La app usa la API publicada (`https://app-api-rutalog.vercel.app`), así que no hace falta levantar ningún servidor.
 
 **Entrar:** `courier1@rutalog.pe`, clave `1234` (Rosa Huamán Torres, zona Lima y Callao). Al entrar, aceptar los permisos de **ubicación** y de **notificaciones**.
 
