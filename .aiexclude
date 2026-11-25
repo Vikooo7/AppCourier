@@ -1,0 +1,12 @@
+# Lo que los agentes de IA (Gemini en Android Studio y otros) no deben leer.
+# Misma sintaxis que .gitignore. Es la segunda capa de seguridad, despues del .gitignore.
+local.properties
+keystore.properties
+*.jks
+*.keystore
+*.p12
+*.pem
+.env
+.env.*
+app/google-services.json
+apk/
