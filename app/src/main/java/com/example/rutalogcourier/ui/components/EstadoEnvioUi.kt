@@ -207,12 +207,13 @@ private fun PasoLineaTiempo(
                 }
             }
             if (!esUltimo) {
-                Box(
+                // Tramo de la ruta: lleno si ya se recorrió, punteado si todavía falta.
+                TramoRuta(
+                    recorrido = lineaCompleta,
+                    color = if (lineaCompleta) paso.color else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier
                         .width(3.dp)
                         .weight(1f)
-                        .clip(CircleShape)
-                        .background(if (lineaCompleta) paso.color else MaterialTheme.colorScheme.outlineVariant)
                 )
             }
         }

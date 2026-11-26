@@ -1,5 +1,10 @@
 package com.example.rutalogcourier.ui.screens
 
+import com.example.rutalogcourier.ui.components.MensajeAdvertencia
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.example.rutalogcourier.ui.components.BotonCopiarGuia
+import com.example.rutalogcourier.ui.theme.FuenteGuia
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,6 +92,7 @@ fun ParadaScreen(
 ) {
     val context = LocalContext.current
     val alcance = rememberCoroutineScope()
+    val vibracion = LocalHapticFeedback.current
     var error by remember { mutableStateOf<String?>(null) }
     var escaneando by remember { mutableStateOf(false) }
     var escribirGuia by remember { mutableStateOf(false) }
@@ -99,9 +105,14 @@ fun ParadaScreen(
             return@AppScaffold
         }
 
+        val acciones = ReglasCourier.acciones(parada)
+
+        // Datos arriba (con scroll) y acciones fijas abajo, al alcance del pulgar.
+        Column(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -110,13 +121,16 @@ fun ParadaScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(parada.tipo.etiqueta.uppercase(), color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            parada.numeroGuia,
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                parada.numeroGuia,
+                                color = Color.White,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontFamily = FuenteGuia,
+                                fontWeight = FontWeight.Bold
+                            )
+                            BotonCopiarGuia(guia = parada.numeroGuia)
+                        }
                     }
                     EstadoBadge(estado = parada.estado, sobreFondoOscuro = true)
                 }
@@ -125,9 +139,17 @@ fun ParadaScreen(
             }
 
             // Ética del caso: el courier solo ve nombre, dirección y teléfono, y solo durante la entrega.
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Destinatario", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (parada.tipo == TipoParada.ENTREGA) "Destinatario" else "Datos del recojo",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
                     if (parada.tipo == TipoParada.ENTREGA) {
                         Fila(Icons.Default.Person, "Nombre", parada.destinatarioNombre ?: "No registrado")
                         parada.destinatarioTelefono?.let { Fila(Icons.Default.Phone, "Celular", it) }
@@ -175,20 +197,22 @@ fun ParadaScreen(
                 }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Sincronización: ", style = MaterialTheme.typography.bodySmall)
-                SyncStatusIndicator(estado = parada.estadoSync)
+            // Solo se avisa cuando hay algo por enviar o un rechazo; "sincronizado" es lo normal.
+            if (parada.estadoSync != EstadoSincronizacion.SINCRONIZADO) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Sincronización: ", style = MaterialTheme.typography.bodySmall)
+                    SyncStatusIndicator(estado = parada.estadoSync)
+                }
             }
             parada.mensajeError?.let { MensajeError(texto = it) }
             if (parada.estadoSync == EstadoSincronizacion.ERROR) {
-                MensajeInfo("El servidor rechazó un registro de esta parada. Ve a Sincronizar para reintentar o descartar.")
+                MensajeAdvertencia("El servidor rechazó un registro de esta parada. Ve a Sincronizar para reintentar o descartar.")
             }
             error?.let { MensajeError(texto = it) }
 
-            val acciones = ReglasCourier.acciones(parada)
             // RF-C03 / RN-06: cada avance lleva hora y GPS. Con la ubicación apagada se registra igual, pero sin GPS.
             if (acciones.isNotEmpty() && !ubicacionActiva(context)) {
-                MensajeInfo("La ubicación del teléfono está apagada: los registros se guardarán sin GPS. Actívala en los ajustes rápidos.")
+                MensajeAdvertencia("La ubicación del teléfono está apagada: los registros se guardarán sin GPS. Actívala en los ajustes rápidos.")
             }
             if (acciones.isEmpty()) {
                 MensajeInfo(
@@ -200,7 +224,16 @@ fun ParadaScreen(
                     }
                 )
             }
+        }
 
+        if (acciones.isNotEmpty()) {
+            Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
             acciones.forEach { accion ->
                 when (accion) {
                     AccionCourier.ESCANEAR_RECOJO -> {
@@ -211,7 +244,11 @@ fun ParadaScreen(
                                 alcance.launch {
                                     val leida = EscanerGuia.escanear(context)
                                     escaneando = false
-                                    if (leida != null) onRecoger(parada, leida) { error = it }
+                                    if (leida != null) {
+                                        // Se leyó la guía: vibración corta para no tener que mirar la pantalla.
+                                        vibracion.performHapticFeedback(HapticFeedbackType.Confirm)
+                                        onRecoger(parada, leida) { error = it }
+                                    }
                                 }
                             },
                             enabled = !escaneando,
@@ -284,6 +321,9 @@ fun ParadaScreen(
                     }
                 }
             }
+            }
+            }
+        }
         }
 
         if (escribirGuia) {

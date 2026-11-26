@@ -1,5 +1,18 @@
 package com.example.rutalogcourier.ui.screens
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Navigation
+import android.widget.Toast
+import android.net.Uri
+import android.content.Intent
+import android.content.Context
+import android.content.ActivityNotFoundException
+import com.example.rutalogcourier.ui.theme.FuenteGuia
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -110,6 +123,17 @@ fun RutaScreen(
                     sincronizando = sincronizando,
                     onActualizar = onActualizar
                 )
+            }
+
+            // Lo primero que necesita el courier en la calle: a dónde va ahora y cómo llegar.
+            enRuta.firstOrNull()?.let { siguiente ->
+                item {
+                    SiguienteParada(
+                        parada = siguiente,
+                        restantes = enRuta.size,
+                        onAbrir = { onParada(siguiente) }
+                    )
+                }
             }
 
             if (enRuta.isNotEmpty()) {
@@ -271,7 +295,7 @@ private fun TarjetaParada(
                     Text(
                         text = parada.numeroGuia,
                         style = MaterialTheme.typography.labelMedium,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FuenteGuia
                     )
                 }
                 Text(
@@ -323,6 +347,99 @@ private fun TarjetaParada(
                     }
                 }
             }
+        }
+    }
+}
+
+/** La próxima parada de la ruta con accesos directos: navegar con el mapa del teléfono, llamar y abrir la parada. */
+@Composable
+private fun SiguienteParada(parada: Parada, restantes: Int, onAbrir: () -> Unit) {
+    val context = LocalContext.current
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Siguiente parada",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (restantes == 1) "Última parada" else "Quedan $restantes",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+            Text(
+                text = "${parada.tipo.etiqueta} · ${parada.numeroGuia}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FuenteGuia,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = parada.destinatarioDireccion ?: parada.ruta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            parada.textoRiesgo?.let {
+                Text(
+                    text = "Riesgo alto ($it): llama antes de ir",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                if (parada.tieneUbicacion) {
+                    Button(
+                        onClick = { abrirNavegacion(context, parada.latitud!!, parada.longitud!!) },
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Icon(Icons.Default.Navigation, contentDescription = null)
+                        Text(" Navegar")
+                    }
+                }
+                parada.destinatarioTelefono?.let { telefono ->
+                    OutlinedButton(
+                        onClick = { context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$telefono"))) },
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Icon(Icons.Default.Phone, contentDescription = null)
+                        Text(" Llamar")
+                    }
+                }
+                OutlinedButton(
+                    onClick = onAbrir,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    Text("Abrir")
+                }
+            }
+        }
+    }
+}
+
+/** Abre Google Maps (o el mapa que tenga el teléfono) con la ruta hacia la parada. */
+private fun abrirNavegacion(context: Context, latitud: Double, longitud: Double) {
+    val navegacion = Intent(Intent.ACTION_VIEW, Uri.parse("google.navigation:q=$latitud,$longitud"))
+    val mapa = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$latitud,$longitud?q=$latitud,$longitud"))
+    try {
+        context.startActivity(navegacion)
+    } catch (_: ActivityNotFoundException) {
+        try {
+            context.startActivity(mapa)
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "No hay una app de mapas instalada", Toast.LENGTH_SHORT).show()
         }
     }
 }

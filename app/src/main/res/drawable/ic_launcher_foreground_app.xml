@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primer plano del ícono: el logo de RutaLog un poco más chico (para dejar sitio) y la insignia de la app. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@mipmap/ic_launcher_foreground"
+        android:left="5.5dp"
+        android:top="5.5dp"
+        android:right="9.6dp"
+        android:bottom="9.6dp" />
+    <item android:drawable="@drawable/ic_launcher_insignia" />
+</layer-list>

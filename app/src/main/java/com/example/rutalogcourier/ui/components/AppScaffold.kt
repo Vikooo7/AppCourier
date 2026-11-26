@@ -2,6 +2,8 @@
 
 package com.example.rutalogcourier.ui.components
 
+import androidx.compose.foundation.layout.Row
+import com.example.rutalogcourier.ui.theme.BotonTema
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -23,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -97,16 +100,19 @@ fun AppScaffold(
                         IconButton(onClick = onVolver) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                         }
+                    } else if (onCerrarSesion != null) {
+                        // La cuenta de quien usa la app: sus datos y la opción de cerrar sesión.
+                        AvatarUsuario(
+                            onCerrarSesion = { confirmarSalida = true },
+                            modifier = Modifier.padding(start = 8.dp, end = 4.dp)
+                        )
                     } else {
                         AppEmblema(modifier = Modifier.padding(start = 12.dp, end = 4.dp))
                     }
                 },
                 actions = {
-                    if (onCerrarSesion != null) {
-                        IconButton(onClick = { confirmarSalida = true }) {
-                            Icon(Icons.Default.PowerSettingsNew, contentDescription = "Cerrar sesión")
-                        }
-                    }
+                    if (onCerrarSesion != null) BotonTema()
+                    if (pestana != null) BotonMenuLateral()
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = AzulRuta,
@@ -116,40 +122,31 @@ fun AppScaffold(
                 )
             )
         },
-        bottomBar = {
-            if (pestana != null) {
-                NavigationBar {
-                    PestanaCourier.entries.forEach { opcion ->
-                        NavigationBarItem(
-                            selected = opcion == pestana,
-                            onClick = { if (opcion != pestana) onPestana(opcion) },
-                            icon = {
-                                // La pestaña Sincronizar muestra cuántas operaciones hay en la cola.
-                                if (opcion == PestanaCourier.SINCRONIZAR && enCola > 0) {
-                                    BadgedBox(badge = { Badge { Text(enCola.toString()) } }) {
-                                        Icon(opcion.icono, contentDescription = opcion.etiqueta)
-                                    }
-                                } else {
-                                    Icon(opcion.icono, contentDescription = opcion.etiqueta)
-                                }
-                            },
-                            label = { Text(opcion.etiqueta, maxLines = 1) }
-                        )
-                    }
-                }
-            }
-        }
     ) { innerPadding ->
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .imePadding()
         ) {
-            ConnectivityBanner(enLinea = enLinea)
-            Box(modifier = Modifier.weight(1f)) {
-                content(PaddingValues(0.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                ConnectivityBanner(enLinea = enLinea)
+                Box(modifier = Modifier.weight(1f)) {
+                    content(PaddingValues(0.dp))
+                }
+            }
+            // Menú vertical a la derecha (antes era la barra inferior); se oculta con el botón de la barra superior.
+            if (pestana != null) {
+                MenuLateral(
+                    visible = PreferenciaMenu.visible,
+                    opciones = PestanaCourier.entries,
+                    seleccionada = pestana,
+                    etiqueta = { it.etiqueta },
+                    icono = { it.icono },
+                    insignia = { if (it == PestanaCourier.SINCRONIZAR) enCola else 0 },
+                    onSeleccion = { if (it != pestana) onPestana(it) }
+                )
             }
         }
     }
@@ -157,7 +154,7 @@ fun AppScaffold(
     if (confirmarSalida && onCerrarSesion != null) {
         AlertDialog(
             onDismissRequest = { confirmarSalida = false },
-            icon = { Icon(Icons.Default.PowerSettingsNew, contentDescription = null) },
+            icon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
             title = { Text("¿Cerrar sesión?") },
             text = {
                 Text(

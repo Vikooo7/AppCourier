@@ -1,5 +1,15 @@
 package com.example.rutalogcourier.ui.screens
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import com.example.rutalogcourier.ui.theme.FuenteGuia
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -172,28 +182,59 @@ fun SyncScreen(
                 )
             }
 
+            // Prueba de la Semana 8 (el servidor falla y la cola no pierde datos). Queda plegada para que no
+            // estorbe al usuario; se abre sola si el interruptor quedó encendido.
             item {
+                var herramientasAbiertas by rememberSaveable { mutableStateOf(estado.simularErrorServidor) }
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { herramientasAbiertas = !herramientasAbiertas }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Simular error del servidor",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Solo para la prueba: la API responde con error 503 y las operaciones se conservan en la cola.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Herramientas de prueba",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                            if (herramientasAbiertas) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (herramientasAbiertas) "Ocultar herramientas de prueba" else "Mostrar herramientas de prueba",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    AnimatedVisibility(visible = herramientasAbiertas) {
+                        Row(
+                            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Simular error del servidor",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Solo para la prueba: la API responde con error 503 y las operaciones se conservan en la cola.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(checked = estado.simularErrorServidor, onCheckedChange = onSimularError)
                         }
-                        Switch(checked = estado.simularErrorServidor, onCheckedChange = onSimularError)
                     }
                 }
             }
@@ -243,10 +284,10 @@ private fun OperacionCard(
                     Text(
                         text = operacion.numeroGuia,
                         style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FuenteGuia
                     )
                 }
-                SyncStatusIndicator(estado = operacion.estado)
+                SyncStatusIndicator(estado = operacion.estado, mostrarSincronizado = true)
             }
 
             Text(

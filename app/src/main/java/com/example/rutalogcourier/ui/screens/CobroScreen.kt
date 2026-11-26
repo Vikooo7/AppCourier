@@ -1,5 +1,6 @@
 package com.example.rutalogcourier.ui.screens
 
+import com.example.rutalogcourier.ui.theme.FuenteGuia
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -112,7 +113,7 @@ fun CobroScreen(
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
-                parada.cobroNro?.let { Text("Operación $it", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary) }
+                parada.cobroNro?.let { Text("Operación $it", fontFamily = FuenteGuia, color = MaterialTheme.colorScheme.primary) }
                 Button(onClick = { onContinuar(parada) }, modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp)) { Text("Continuar con la entrega") }
@@ -122,7 +123,7 @@ fun CobroScreen(
             val qr = parada.cobroQr
             if (qr != null) {
                 QrCobro(qr)
-                Text(qr.removePrefix("BANCOANDINO:"), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
+                Text(qr.removePrefix("BANCOANDINO:"), fontFamily = FuenteGuia, fontWeight = FontWeight.SemiBold)
                 Text(
                     "El destinatario abre Banco Andino → Pagar con QR y escanea este código. El monto ya está fijado.",
                     style = MaterialTheme.typography.bodySmall,

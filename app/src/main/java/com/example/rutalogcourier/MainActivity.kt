@@ -1,5 +1,8 @@
 package com.example.rutalogcourier
 
+import com.example.rutalogcourier.ui.components.PreferenciaMenu
+import androidx.compose.runtime.LaunchedEffect
+import com.example.rutalogcourier.ui.theme.PreferenciaTema
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -31,7 +34,18 @@ class MainActivity : ComponentActivity() {
 
         val contenedor = (application as RutaLogCourierApplication).contenedor
 
+        PreferenciaTema.cargar(this)
+        PreferenciaMenu.cargar(this)
         setContent {
+            val oscuro = PreferenciaTema.esOscuro()
+            LaunchedEffect(oscuro) {
+                // La barra superior siempre es azul; la de navegación del sistema sigue el tema elegido.
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+                    navigationBarStyle = if (oscuro) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                    else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                )
+            }
             RutaLogTheme {
                 val authViewModel: AuthViewModel = viewModel(
                     factory = AuthViewModel.factory(contenedor.authRepository)

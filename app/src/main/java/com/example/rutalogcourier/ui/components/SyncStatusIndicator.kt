@@ -39,7 +39,16 @@ val EstadoSincronizacion.icono: ImageVector
 
 /** Muestra si un cambio ya está en el servidor, sigue en la cola o fue rechazado. */
 @Composable
-fun SyncStatusIndicator(estado: EstadoSincronizacion, modifier: Modifier = Modifier) {
+fun SyncStatusIndicator(
+    estado: EstadoSincronizacion,
+    modifier: Modifier = Modifier,
+    mostrarSincronizado: Boolean = false
+) {
+    // "Sincronizado" es lo normal: en tarjetas y detalles solo se avisa lo pendiente o rechazado.
+    if (estado == EstadoSincronizacion.SINCRONIZADO && !mostrarSincronizado) {
+        Spacer(modifier = modifier)
+        return
+    }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Icon(
             imageVector = estado.icono,

@@ -1,5 +1,6 @@
 package com.example.rutalogcourier.ui.components
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,6 +93,31 @@ fun MensajeInfo(texto: String) {
     }
 }
 
+/** Advertencia: algo que conviene corregir sin ser un error (por ejemplo, la ubicación apagada). */
+@Composable
+fun MensajeAdvertencia(texto: String) {
+    val oscuro = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val fondo = if (oscuro) Color(0xFF4A3B00) else Color(0xFFFFF4CE)
+    val tinta = if (oscuro) Color(0xFFFFE08A) else Color(0xFF5C4200)
+    Surface(color = fondo, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = tinta,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = texto, color = tinta, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 @Composable
 fun EstadoVacio(
     icono: ImageVector,
@@ -106,20 +132,7 @@ fun EstadoVacio(
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icono,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(36.dp)
-            )
-        }
+        IlustracionRuta(icono = icono)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = titulo,
@@ -139,7 +152,7 @@ fun EstadoVacio(
     }
 }
 
-/** Tarjeta de cabecera con el degradado azul de la marca. */
+/** Tarjeta de cabecera con el degradado azul de la marca y la ruta animada de fondo. */
 @Composable
 fun BannerDegradado(
     modifier: Modifier = Modifier,
@@ -151,15 +164,8 @@ fun BannerDegradado(
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(AzulRuta, AzulRutaClaro)))
     ) {
-        Icon(
-            imageVector = Icons.Default.LocalShipping,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.08f),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .size(120.dp)
-                .offset(x = 20.dp, y = 20.dp)
-        )
+        // El motivo de RutaLog en lugar del camión genérico: una ruta punteada que avanza hasta el destino.
+        FondoRuta(modifier = Modifier.matchParentSize())
         Column(modifier = Modifier.padding(20.dp), content = content)
     }
 }

@@ -1,5 +1,6 @@
 package com.example.rutalogcourier.ui.navigation
 
+import com.example.rutalogcourier.ui.components.LocalUsuarioActual
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -95,7 +96,8 @@ fun AppNavigation(
 
     CompositionLocalProvider(
         LocalEnLinea provides sync.enLinea,
-        LocalOperacionesEnCola provides sync.operaciones.size
+        LocalOperacionesEnCola provides sync.operaciones.size,
+        LocalUsuarioActual provides auth.usuario
     ) {
         NavHost(
             navController = navController,

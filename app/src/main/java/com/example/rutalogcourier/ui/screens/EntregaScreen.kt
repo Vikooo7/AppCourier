@@ -1,5 +1,7 @@
 package com.example.rutalogcourier.ui.screens
 
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,6 +80,7 @@ fun EntregaScreen(
     var dni by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var guardando by remember { mutableStateOf(false) }
+    val vibracion = LocalHapticFeedback.current
     val firma = rememberEstadoFirma()
     val tomarFoto = rememberCamara(onFoto = { if (it != null) foto = it }, onError = { error = it })
 
@@ -152,6 +155,8 @@ fun EntregaScreen(
                         },
                         {
                             guardando = false
+                            // Confirma con una vibración que la entrega quedó registrada (entrega o fallida), sin mirar la pantalla.
+                            vibracion.performHapticFeedback(HapticFeedbackType.Confirm)
                             onVolver()
                         }
                     )
@@ -188,6 +193,7 @@ fun FallidaScreen(
     var foto by remember { mutableStateOf<ByteArray?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var guardando by remember { mutableStateOf(false) }
+    val vibracion = LocalHapticFeedback.current
     val tomarFoto = rememberCamara(onFoto = { if (it != null) foto = it }, onError = { error = it })
 
     AppScaffold(titulo = "Entrega fallida", subtitulo = parada?.numeroGuia, onVolver = onVolver) {
@@ -249,6 +255,8 @@ fun FallidaScreen(
                         },
                         {
                             guardando = false
+                            // Confirma con una vibración que la entrega quedó registrada (entrega o fallida), sin mirar la pantalla.
+                            vibracion.performHapticFeedback(HapticFeedbackType.Confirm)
                             onVolver()
                         }
                     )
